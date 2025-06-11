@@ -1,0 +1,48 @@
+# ワークフローの名前
+name: Docker Image CI
+
+# ワークフローが実行されるトリガーを指定
+on:
+  push:
+    branches: [ "main" ] # mainブランチにプッシュされたときに実行
+
+# 実行するジョブを定義
+jobs:
+  build_and_push:
+    # ジョブを実行する仮想環境を指定
+    runs-on: ubuntu-24.04
+
+    # このジョブにghcr.ioへの書き込み権限を付与
+    permissions:
+      contents: read
+      packages: write
+
+    # ジョブのステップを定義
+    steps:
+      # 1. リポジトリのコードをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. GitHub Container Registry (ghcr.io) へのログイン
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Dockerイメージのメタデータを抽出 (タグ付けのため)
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      # 4. Dockerイメージのビルドとプッシュ
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
