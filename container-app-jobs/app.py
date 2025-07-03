@@ -14,29 +14,8 @@ if APPLICATIONINSIGHTS_CONNECTION_STRING:
 else:
     print("APPLICATIONINSIGHTS_CONNECTION_STRING環境変数が設定されていません。Application Insightsへのログ送信は無効です。")
 
-# ログの設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),  # コンソール出力
-    ]
-)
-
-# Azure Monitor OpenTelemetryが設定されている場合、Application Insightsハンドラーを追加
-if APPLICATIONINSIGHTS_CONNECTION_STRING:
-    from azure.monitor.opentelemetry._logs import AzureMonitorLogHandler
-    
-    # Application Insightsハンドラーを取得
-    azure_handler = AzureMonitorLogHandler(connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING)
-    
-    # ルートロガーにハンドラーを追加
-    root_logger = logging.getLogger()
-    root_logger.addHandler(azure_handler)
-    
-    print("Application Insightsログハンドラーが追加されました")
-
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 def main():
     """バッチ処理のメイン関数"""
