@@ -9,7 +9,7 @@ APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv('APPLICATIONINSIGHTS_CONNECTIO
 
 # Azure Monitor OpenTelemetryの設定（接続文字列が設定されている場合のみ）
 if APPLICATIONINSIGHTS_CONNECTION_STRING:
-    configure_azure_monitor(connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING)
+    configure_azure_monitor(connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING,enable_live_metrics=True)
     print("Azure Monitor OpenTelemetryが設定されました")
 else:
     print("APPLICATIONINSIGHTS_CONNECTION_STRING環境変数が設定されていません。Application Insightsへのログ送信は無効です。")
