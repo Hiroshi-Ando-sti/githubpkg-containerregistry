@@ -21,6 +21,32 @@
 APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=your-instrumentation-key;IngestionEndpoint=https://your-region.in.applicationinsights.azure.com/;LiveEndpoint=https://your-region.livediagnostics.monitor.azure.com/
 ```
 
+### バッチ処理設定
+```
+SLEEP_SECONDS=30  # 待機時間（秒）
+```
+
+### Container Apps環境での推奨設定（オプション）
+```
+CONTAINER_NAME=my-batch-job  # コンテナ名
+REPLICA_NAME=replica-1       # レプリカ名（自動生成も可能）
+```
+
+## レプリカ識別機能
+
+このアプリケーションは以下の情報を使用してレプリカを識別します：
+
+- **REPLICA_ID**: UUIDベースの一意識別子（自動生成）
+- **HOSTNAME**: コンテナのホスト名
+- **PROCESS_ID**: プロセスID
+- **CONTAINER_NAME**: 環境変数から取得
+- **REPLICA_NAME**: 環境変数から取得（未設定時は自動生成）
+
+これらの情報は：
+- ログメッセージのフォーマットに含まれる
+- Application Insightsのカスタム属性として送信される
+- OpenTelemetryトレースの属性として記録される
+
 ## Azure Container Apps Jobsでの設定例
 
 ### 1. Container Apps Environmentの作成
@@ -76,31 +102,58 @@ docker run mybatchjob
 docker run -e APPLICATIONINSIGHTS_CONNECTION_STRING="your-connection-string" mybatchjob
 ```
 
-## Application Insightsでのログ確認
+## Application Insightsでのレプリカ識別
 
-Application Insightsポータルで以下のKQLクエリを使用してログを確認できます：
+Application Insightsポータルで以下のKQLクエリを使用してレプリカ別のログを確認できます：
 
-### ログの確認
+### レプリカ別のログ確認
 ```kql
 traces
 | where message contains "バッチ処理"
+| extend replica_name = customDimensions.replica_name
+| extend replica_id = customDimensions.replica_id
+| extend hostname = customDimensions.hostname
 | order by timestamp desc
+| project timestamp, message, replica_name, replica_id, hostname
 ```
 
-### トレース機能付きバージョンの場合（dependencies テーブル）
+### レプリカ別の実行時間確認
+```kql
+traces
+| where message contains "実行時間"
+| extend 
+    replica_name = customDimensions.replica_name,
+    duration_seconds = customDimensions.duration_seconds
+| order by timestamp desc
+| project timestamp, replica_name, duration_seconds
+```
+
+### Dependencies（トレース）でのレプリカ情報
 ```kql
 dependencies
 | where name == "batch_job"
-| extend duration_seconds = customDimensions.["job.duration_seconds"]
+| extend 
+    replica_name = customDimensions.["replica.name"],
+    replica_id = customDimensions.["replica.id"],
+    hostname = customDimensions.["host.name"],
+    container_name = customDimensions.["container.name"],
+    duration_seconds = customDimensions.["job.duration_seconds"]
 | order by timestamp desc
+| project timestamp, replica_name, replica_id, hostname, container_name, duration_seconds
 ```
 
-### カスタム属性での検索（トレース機能付きバージョン）
+### レプリカ別のパフォーマンス分析
 ```kql
 dependencies
-| where customDimensions.["job.type"] == "batch_job"
+| where name == "batch_job"
 | extend 
-    phase = customDimensions.["job.phase"],
-    duration = customDimensions.["job.duration_seconds"]
-| order by timestamp desc
+    replica_name = customDimensions.["replica.name"],
+    duration_seconds = todecimal(customDimensions.["job.duration_seconds"])
+| summarize 
+    avg_duration = avg(duration_seconds),
+    max_duration = max(duration_seconds),
+    min_duration = min(duration_seconds),
+    count = count()
+    by replica_name
+| order by avg_duration desc
 ```
