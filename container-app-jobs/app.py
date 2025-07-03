@@ -42,10 +42,18 @@ def main():
         start_time = datetime.now()
         logger.info(f"開始時刻: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         
-        # 30秒待機
+        # SLEEP_SECONDS 秒 待機
+        SLEEP_SECONDS_STR = os.getenv('SLEEP_SECONDS', '30')  # デフォルト値30秒
+        try:
+            SLEEP_SECONDS = int(SLEEP_SECONDS_STR)
+        except ValueError:
+            logger.warning(f"SLEEP_SECONDS環境変数の値が無効です: {SLEEP_SECONDS_STR}. デフォルト値30秒を使用します。")
+            SLEEP_SECONDS = 30
+        
         span.set_attribute("job.phase", "processing")
-        logger.info("30秒間待機します...")
-        time.sleep(30)
+        span.set_attribute("job.sleep_seconds", SLEEP_SECONDS)
+        logger.info(f"{SLEEP_SECONDS}秒間待機します...")
+        time.sleep(SLEEP_SECONDS)
         
         # 終了時のログ出力
         span.set_attribute("job.phase", "end")
