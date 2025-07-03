@@ -1,0 +1,64 @@
+# ワークフローの名前
+name: Docker Images CI (Matrix Strategy)
+
+# ワークフローが実行されるトリガーを指定
+on:
+  push:
+    branches: [ "main" ] # mainブランチにプッシュされたときに実行
+
+# 実行するジョブを定義
+jobs:
+  build_and_push:
+    # ジョブを実行する仮想環境を指定
+    runs-on: ubuntu-24.04
+
+    # このジョブにghcr.ioへの書き込み権限を付与
+    permissions:
+      contents: read
+      packages: write
+
+    # マトリックス戦略でwebapi と container-app-jobs を並列実行
+    strategy:
+      matrix:
+        include:
+          - name: webapi
+            context: ./webapi
+            image_name: webapi
+          - name: container-app-jobs
+            context: ./container-app-jobs
+            image_name: container-app-jobs
+
+    # ジョブのステップを定義
+    steps:
+      # 1. リポジトリのコードをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. GitHub Container Registry (ghcr.io) へのログイン
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Dockerイメージのメタデータを抽出 (タグ付けのため)
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image_name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # 4. Dockerイメージのビルドとプッシュ
+      - name: Build and push ${{ matrix.name }} Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

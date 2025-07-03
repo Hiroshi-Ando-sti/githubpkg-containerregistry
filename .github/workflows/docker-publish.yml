@@ -8,7 +8,8 @@ on:
 
 # 実行するジョブを定義
 jobs:
-  build_and_push:
+  # WebAPIのビルドとプッシュ
+  build_and_push_webapi:
     # ジョブを実行する仮想環境を指定
     runs-on: ubuntu-24.04
 
@@ -31,18 +32,68 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. Dockerイメージのメタデータを抽出 (タグ付けのため)
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      # 3. WebAPI用Dockerイメージのメタデータを抽出
+      - name: Extract metadata (tags, labels) for WebAPI Docker
+        id: meta-webapi
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository }}/webapi
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      # 4. Dockerイメージのビルドとプッシュ
-      - name: Build and push Docker image
+      # 4. WebAPI Dockerイメージのビルドとプッシュ
+      - name: Build and push WebAPI Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./webapi
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-webapi.outputs.tags }}
+          labels: ${{ steps.meta-webapi.outputs.labels }}
+
+  # Container App Jobsのビルドとプッシュ
+  build_and_push_container_app_jobs:
+    # ジョブを実行する仮想環境を指定
+    runs-on: ubuntu-24.04
+
+    # このジョブにghcr.ioへの書き込み権限を付与
+    permissions:
+      contents: read
+      packages: write
+
+    # ジョブのステップを定義
+    steps:
+      # 1. リポジトリのコードをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. GitHub Container Registry (ghcr.io) へのログイン
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Container App Jobs用Dockerイメージのメタデータを抽出
+      - name: Extract metadata (tags, labels) for Container App Jobs Docker
+        id: meta-jobs
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/container-app-jobs
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # 4. Container App Jobs Dockerイメージのビルドとプッシュ
+      - name: Build and push Container App Jobs Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./container-app-jobs
+          push: true
+          tags: ${{ steps.meta-jobs.outputs.tags }}
+          labels: ${{ steps.meta-jobs.outputs.labels }}

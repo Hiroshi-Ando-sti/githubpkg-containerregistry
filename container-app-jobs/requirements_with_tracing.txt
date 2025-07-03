@@ -1,0 +1,6 @@
+# 基本版（ログのみ）
+azure-monitor-opentelemetry
+
+# トレース機能付きバージョン使用時に追加で必要
+# opentelemetry-api
+# opentelemetry-sdk
